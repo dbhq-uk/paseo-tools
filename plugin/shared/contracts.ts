@@ -1,4 +1,4 @@
-import { defineRpc } from "@getpaseo/plugin/server";
+import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
 /** Formats the viewer can render. Drives which reader the panel opens. */

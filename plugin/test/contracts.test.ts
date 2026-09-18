@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getPage, getRows, listFiles, openDoc, ZOOM } from "../contracts.js";
+import { getPage, getRows, listFiles, openDoc, ZOOM } from "../shared/contracts.js";
 
 /**
  * The contracts are validated on both sides of the IPC boundary, so a schema

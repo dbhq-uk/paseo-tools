@@ -2,7 +2,7 @@ import mammoth from "mammoth";
 import ExcelJS from "exceljs";
 import { parse, type HTMLElement, type Node } from "node-html-parser";
 import { assertOoxml } from "./scan.js";
-import type { Block, Run, SheetMeta } from "../contracts.js";
+import type { Block, Run, SheetMeta } from "../shared/contracts.js";
 
 const HEADINGS: Record<string, number> = { h1: 1, h2: 2, h3: 3, h4: 4, h5: 5, h6: 6 };
 

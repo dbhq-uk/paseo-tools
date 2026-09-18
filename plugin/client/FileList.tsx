@@ -1,9 +1,9 @@
-import { useRpc } from "@getpaseo/plugin";
+import { useRpc } from "@getpaseo/plugin/client";
 import { useQuery } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from "react-native";
-import { listFiles, type FileEntry } from "../contracts.js";
-import { humanSize, KIND_LABEL, type Styles } from "./theme.client.js";
+import { listFiles, type FileEntry } from "../shared/contracts.js";
+import { humanSize, KIND_LABEL, type Styles } from "./theme.js";
 
 interface Props {
   workspaceId: string;

@@ -1,7 +1,7 @@
 import React from "react";
 import { Image, ScrollView, Text, View } from "react-native";
-import type { Block, Run } from "../contracts.js";
-import type { Styles } from "./theme.client.js";
+import type { Block, Run } from "../shared/contracts.js";
+import type { Styles } from "./theme.js";
 
 const HEADING_SIZE: Record<number, number> = { 1: 26, 2: 21, 3: 18, 4: 16, 5: 15, 6: 14 };
 

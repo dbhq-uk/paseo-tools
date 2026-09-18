@@ -1,9 +1,9 @@
-import { useRpc } from "@getpaseo/plugin";
+import { useRpc } from "@getpaseo/plugin/client";
 import { useQuery } from "@tanstack/react-query";
 import React, { useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from "react-native";
-import { getRows, type SheetMeta } from "../contracts.js";
-import type { Styles } from "./theme.client.js";
+import { getRows, type SheetMeta } from "../shared/contracts.js";
+import type { Styles } from "./theme.js";
 
 const PAGE_SIZE = 200;
 

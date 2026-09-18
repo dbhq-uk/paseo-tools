@@ -1,6 +1,5 @@
-import type { PluginContext } from "@getpaseo/plugin";
-import { getPage, getRows, listFiles, openDoc } from "./contracts.js";
-import { FileViewerPanel } from "./main.client.js";
+import type { PluginServerContext } from "@getpaseo/plugin/server";
+import { getPage, getRows, listFiles, openDoc } from "./shared/contracts.js";
 import { readDocument, readRows, readSheetList } from "./server/office.js";
 import { safeResolve, workspaceRoot } from "./server/paths.js";
 import { imageInfo, pdfInfo, renderPage } from "./server/raster.js";
@@ -19,13 +18,13 @@ async function locate(paseo: any, workspaceId: string, relPath: string) {
   return { file, kind };
 }
 
-export default function contribute(plugin: PluginContext) {
-  plugin.handle(listFiles, async ({ workspaceId }, { paseo }) => {
+export default function contribute(server: PluginServerContext) {
+  server.handle(listFiles, async ({ workspaceId }, { paseo }) => {
     const root = await workspaceRoot(paseo, workspaceId);
     return { files: await scanWorkspace(root) };
   });
 
-  plugin.handle(openDoc, async ({ workspaceId, relPath }, { paseo }) => {
+  server.handle(openDoc, async ({ workspaceId, relPath }, { paseo }) => {
     const { file, kind } = await locate(paseo, workspaceId, relPath);
     if (kind === "pdf") return { kind: "pdf" as const, ...(await pdfInfo(file)) };
     if (kind === "image") return { kind: "image" as const, ...(await imageInfo(file)) };
@@ -33,36 +32,16 @@ export default function contribute(plugin: PluginContext) {
     return { kind: "sheet" as const, sheets: await readSheetList(file) };
   });
 
-  plugin.handle(getPage, async ({ workspaceId, relPath, page, dpi }, { paseo }) => {
+  server.handle(getPage, async ({ workspaceId, relPath, page, dpi }, { paseo }) => {
     const { file, kind } = await locate(paseo, workspaceId, relPath);
     if (kind !== "pdf" && kind !== "image") throw new Error("This file is not rendered as pages");
     return await renderPage(file, kind, page, dpi);
   });
 
-  plugin.handle(getRows, async ({ workspaceId, relPath, sheet, offset, limit }, { paseo }) => {
+  server.handle(getRows, async ({ workspaceId, relPath, sheet, offset, limit }, { paseo }) => {
     const { file, kind } = await locate(paseo, workspaceId, relPath);
     if (kind !== "sheet") throw new Error("This file is not a spreadsheet");
     return await readRows(file, sheet, offset, limit);
-  });
-
-  plugin.addWorkspacePanel({
-    id: "files",
-    title: "Viewer",
-    icon: "FileText",
-    context: "workspace",
-    locations: ["workspace", "explorer"],
-    Component: FileViewerPanel,
-  });
-
-  plugin.addCommandCenterItem({
-    id: "open-viewer",
-    title: "Open file viewer",
-    icon: "FileText",
-    context: "workspace",
-    keywords: ["pdf", "document", "spreadsheet", "image", "view"],
-    onSelect({ openPanel }) {
-      openPanel("files");
-    },
   });
 
   return () => {};

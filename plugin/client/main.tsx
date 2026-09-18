@@ -1,13 +1,13 @@
-import { useRpc, type PluginWorkspacePanelProps } from "@getpaseo/plugin";
+import { useRpc, type PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
 import { useQuery } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { openDoc, type FileEntry } from "./contracts.js";
-import { DocReader } from "./client/DocReader.client.js";
-import { FileList } from "./client/FileList.client.js";
-import { PageReader } from "./client/PageReader.client.js";
-import { SheetReader } from "./client/SheetReader.client.js";
-import { makeStyles } from "./client/theme.client.js";
+import { openDoc, type FileEntry } from "../shared/contracts.js";
+import { DocReader } from "./DocReader.js";
+import { FileList } from "./FileList.js";
+import { PageReader } from "./PageReader.js";
+import { SheetReader } from "./SheetReader.js";
+import { makeStyles } from "./theme.js";
 
 /** Opens the selected file and hands off to the reader that suits its kind. */
 function Reader({

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { readDocument, readRows, readSheetList } from "../server/office.js";
-import type { Block, Run } from "../contracts.js";
+import type { Block, Run } from "../shared/contracts.js";
 
 const fixtures = new URL("./fixtures/", import.meta.url).pathname;
 const at = (name: string) => join(fixtures, name);

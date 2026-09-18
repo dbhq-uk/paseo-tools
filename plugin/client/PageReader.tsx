@@ -1,9 +1,9 @@
-import { useRpc } from "@getpaseo/plugin";
+import { useRpc } from "@getpaseo/plugin/client";
 import { useQuery } from "@tanstack/react-query";
 import React, { useState } from "react";
 import { ActivityIndicator, Image, ScrollView, Text, View, useWindowDimensions } from "react-native";
-import { getPage, ZOOM } from "../contracts.js";
-import type { Styles } from "./theme.client.js";
+import { getPage, ZOOM } from "../shared/contracts.js";
+import type { Styles } from "./theme.js";
 
 interface Props {
   workspaceId: string;

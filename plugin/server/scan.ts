@@ -1,6 +1,6 @@
 import { readdir, stat, open } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
-import type { FileKind, FileEntry } from "../contracts.js";
+import type { FileKind, FileEntry } from "../shared/contracts.js";
 
 const BY_EXTENSION: Record<string, FileKind> = {
   ".pdf": "pdf",
