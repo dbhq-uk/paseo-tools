@@ -822,12 +822,14 @@ def cmd_stop(a) -> int:
                 f"tailscale serve port {port}: {'off' if ok else 'could not turn off (already off, or no permission)'}"
             )
         if pid and pid_alive(pid) and is_ferry_process(pid):
-            os.kill(pid, signal.SIGTERM)
-            deadline = time.monotonic() + 5
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(pid, signal.SIGTERM)
+            deadline = time.monotonic() + 10
             while pid_alive(pid) and time.monotonic() < deadline:
                 time.sleep(0.05)
             if pid_alive(pid):
-                os.kill(pid, signal.SIGKILL)
+                with contextlib.suppress(ProcessLookupError):
+                    os.kill(pid, signal.SIGKILL)
         count, total = received_since(st)
         for leftover in (state_path(port), state_dir() / f"{port}.log"):
             with contextlib.suppress(OSError):
