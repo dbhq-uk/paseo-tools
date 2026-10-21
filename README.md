@@ -9,6 +9,7 @@ A free, open-source collection by [DBHQ](https://dbhq.uk).
 | Name | Kind | What it does |
 | --- | --- | --- |
 | [ferry](skills/ferry/README.md) | Skill | Moves files and data between the operator's devices, including the Paseo browser, and the server. Token-protected, tailnet-only HTTPS. |
+| [secrets](plugins/secrets/README.md) | Paseo plugin | Lets an agent ask for a secret. A masked box appears in the app, and the value is stored in a protected file on the server, never in the chat. |
 | [file-viewer](plugins/file-viewer/README.md) | Paseo plugin | A Viewer panel for PDFs, images, Word documents and spreadsheets, which Paseo's files panel shows as binary noise. |
 
 More will follow. The layout keeps each kind in its own folder:
@@ -49,6 +50,7 @@ Paseo plugins are installed with `paseo plugin install`. See each plugin's READM
 python3 -m pytest skills        # skill tests, no network
 ruff check . && ruff format --check .
 cd plugins/file-viewer && npm ci && npm run typecheck && npm test
+cd plugins/secrets && npm ci && npm run typecheck && npm test
 ```
 
 See [AGENTS.md](AGENTS.md) for the rules this repository follows.
