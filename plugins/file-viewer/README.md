@@ -1,19 +1,8 @@
-<div align="center">
-
-# paseo-file-viewer
+# file-viewer
 
 **Read PDFs, images, Word documents and spreadsheets inside Paseo**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Paseo](https://img.shields.io/badge/Paseo-Plugin-6f4ef2)](https://paseo.sh)
-[![CI](https://github.com/dbhq-uk/paseo-file-viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/dbhq-uk/paseo-file-viewer/actions/workflows/ci.yml)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey)]()
-
-A free, open-source tool by [DBHQ](https://dbhq.uk)
-
-</div>
-
----
+A Paseo plugin in [paseo-tools](../../README.md), by [DBHQ](https://dbhq.uk). It was developed as `dbhq-uk/paseo-file-viewer` and moved here with its history.
 
 Paseo's files panel renders text and code. Everything else - a signed contract, a bank statement, an architecture diagram, a 33-sheet workbook - shows as binary noise. On a phone, where Paseo is often the only way in to the machine, those files simply cannot be read.
 
@@ -38,8 +27,8 @@ brew install poppler imagemagick librsvg                  # macOS
 Then:
 
 ```bash
-git clone https://github.com/dbhq-uk/paseo-file-viewer
-cd paseo-file-viewer/plugin && npm install
+git clone https://github.com/dbhq-uk/paseo-tools
+cd paseo-tools/plugins/file-viewer && npm install
 paseo plugin install "$(pwd)"
 ```
 
@@ -75,7 +64,7 @@ This matters because **Paseo plugins are trusted, unsandboxed code**. The backen
 ## Development
 
 ```bash
-cd plugin
+cd plugins/file-viewer
 npm install
 npm run typecheck
 npm test

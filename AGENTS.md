@@ -16,7 +16,9 @@ skills/<name>/SKILL.md              the skill, written for the agent
 skills/<name>/README.md             the skill, written for people
 skills/<name>/scripts/              the code, standard library only
 skills/<name>/tests/                pytest, no network
-plugins/<name>/                     Paseo plugins, each with its own paseo-plugin.json
+plugins/<name>/                     Paseo plugins, each a Node project with its own paseo-plugin.json,
+                                    package.json and lockfile. CI: one workflow per plugin, path-filtered
+.github/workflows/<name>.yml        the workflow for plugins/<name>/
 install.sh                          symlinks every skills/<name>/ into ~/.claude/skills/
 pyproject.toml                      ruff config for every skill
 .github/workflows/validate.yml      CI
@@ -37,6 +39,12 @@ pyproject.toml                      ruff config for every skill
 - **No version in `plugin.json`.** The commit is the version.
 - **No secrets in the tree.** Tokens are printed to the terminal only. No tokens, URLs with tokens or email addresses in docs, tests, logs or commits.
 - **House style.** British English, plain hyphens, never an em or en dash (CI fails on them), no full stop at the end of a heading.
+
+## Adding a Paseo plugin
+
+Put it in `plugins/<name>/` with `paseo-plugin.json` at its root (see the `paseo-plugin` skill and https://paseo.sh/docs/plugins). Give it its own workflow in `.github/workflows/`, filtered to its folder, with actions pinned by SHA and `permissions: contents: read`. Add an npm entry for its folder to `.github/dependabot.yml`, and a row to the table in `README.md`. A plugin is trusted, unsandboxed code: say what it reads and runs in its README.
+
+`plugins/file-viewer` came from `dbhq-uk/paseo-file-viewer` with its history (a subtree import). That repository is not touched by this one.
 
 ## ferry
 

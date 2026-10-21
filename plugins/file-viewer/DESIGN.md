@@ -1,7 +1,7 @@
 # Paseo File Viewer - design
 
 **Status:** design agreed 2nd September 2026, not yet implemented
-**Repo:** `dbhq-uk/paseo-file-viewer` (public - a free tool by DBHQ)
+**Repo:** `dbhq-uk/paseo-tools`, under `plugins/file-viewer` (public - a free tool by DBHQ). It began as `dbhq-uk/paseo-file-viewer`.
 **Target:** Paseo 0.7.2 plugin API
 
 ## The problem

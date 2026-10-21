@@ -25,3 +25,5 @@ node_modules/
 # Scratch space for live tests. Received files are data: keep them in the repo
 # that owns the work, not here.
 scratch/
+dist/
+*.local.ts

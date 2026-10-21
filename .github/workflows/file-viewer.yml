@@ -1,17 +1,27 @@
-name: CI
+name: File viewer
 
 on:
   push:
-    branches: [main]
+    paths:
+      - "plugins/file-viewer/**"
+      - ".github/workflows/file-viewer.yml"
   pull_request:
+    paths:
+      - "plugins/file-viewer/**"
+      - ".github/workflows/file-viewer.yml"
   workflow_dispatch:
+
+# A second push to the same branch cancels the first.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 defaults:
   run:
-    working-directory: plugin
+    working-directory: plugins/file-viewer
 
 jobs:
   test:
@@ -23,7 +33,7 @@ jobs:
         node: ["20", "22", "24"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # The renderer shells out to these. Fixtures are committed, so pandoc and
       # qpdf are not needed here - only what the plugin itself calls at runtime.
@@ -33,11 +43,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             poppler-utils imagemagick librsvg2-bin
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-          cache-dependency-path: plugin/package-lock.json
+          cache-dependency-path: plugins/file-viewer/package-lock.json
 
       - run: npm ci
 
@@ -51,12 +61,12 @@ jobs:
     name: Dependency audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: plugin/package-lock.json
+          cache-dependency-path: plugins/file-viewer/package-lock.json
       - run: npm ci
       # SheetJS is deliberately absent because of prototype pollution and ReDoS
       # in its parser. This gate is what stops it, or anything like it, arriving
@@ -68,32 +78,24 @@ jobs:
     name: Fixture generator still runs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install authoring tools
         run: |
           sudo apt-get update
-          # THE LAST TWO ARE NOT OPTIONAL, and --no-install-recommends is why.
-          # It strips ImageMagick's fonts, so every -annotate fails with
-          # "unable to read font `(null)'". libavif-bin supplies avifenc,
-          # because Ubuntu's ImageMagick 6 can read AVIF and cannot write it.
-          # Both broke this one job on 2 Sep 2026 while every other job stayed
-          # green, which is how CI sat red for a fortnight.
           sudo apt-get install -y --no-install-recommends \
-            pandoc qpdf imagemagick poppler-utils librsvg2-bin fonts-dejavu-core \
-            libavif-bin
+            pandoc qpdf imagemagick poppler-utils librsvg2-bin
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: plugin/package-lock.json
+          cache-dependency-path: plugins/file-viewer/package-lock.json
 
       - run: npm ci
 
       # Fixtures are committed, so this does not gate the test job. It catches
-      # the generator rotting unnoticed, which would only be discovered the next
-      # time a fixture needed changing.
+      # the generator rotting unnoticed.
       - name: Regenerate and check the expected set appears
         run: |
           node test/make-fixtures.mjs

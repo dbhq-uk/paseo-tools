@@ -9,6 +9,7 @@ A free, open-source collection by [DBHQ](https://dbhq.uk).
 | Name | Kind | What it does |
 | --- | --- | --- |
 | [ferry](skills/ferry/README.md) | Skill | Moves files and data between the operator's devices, including the Paseo browser, and the server. Token-protected, tailnet-only HTTPS. |
+| [file-viewer](plugins/file-viewer/README.md) | Paseo plugin | A Viewer panel for PDFs, images, Word documents and spreadsheets, which Paseo's files panel shows as binary noise. |
 
 More will follow. The layout keeps each kind in its own folder:
 
@@ -40,11 +41,14 @@ cd paseo-tools
 
 The skills use Python 3.9 or later and the standard library only. Nothing else to install.
 
+Paseo plugins are installed with `paseo plugin install`. See each plugin's README.
+
 ## Develop
 
 ```bash
-python3 -m pytest skills        # tests, no network
+python3 -m pytest skills        # skill tests, no network
 ruff check . && ruff format --check .
+cd plugins/file-viewer && npm ci && npm run typecheck && npm test
 ```
 
 See [AGENTS.md](AGENTS.md) for the rules this repository follows.
