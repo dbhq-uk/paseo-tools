@@ -71,8 +71,14 @@ jobs:
       # SheetJS is deliberately absent because of prototype pollution and ReDoS
       # in its parser. This gate is what stops it, or anything like it, arriving
       # through a transitive dependency later.
-      - name: Fail on moderate or worse
-        run: npm audit --audit-level=moderate
+      #
+      # Production dependencies only, at high. The dev toolchain (react-native,
+      # jest) is never shipped, and its advisories are not this plugin's to fix.
+      # One moderate is accepted on purpose: sprintf-js (via mammoth, via
+      # argparse) has no patched release, and argparse only formats CLI help
+      # text, which mammoth does not run. Revisit when mammoth moves off it.
+      - name: Fail on high or worse in what ships
+        run: npm audit --omit=dev --audit-level=high
 
   fixtures:
     name: Fixture generator still runs
@@ -84,7 +90,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            pandoc qpdf imagemagick poppler-utils librsvg2-bin
+            pandoc qpdf imagemagick poppler-utils librsvg2-bin libavif-bin
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
