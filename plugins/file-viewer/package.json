@@ -10,7 +10,7 @@
   "dependencies": {
     "exceljs": "^4.4.0",
     "mammoth": "^1.12.2",
-    "node-html-parser": "^7.0.1"
+    "node-html-parser": "^9.0.5"
   },
   "devDependencies": {
     "@getpaseo/plugin": "0.8.0",
