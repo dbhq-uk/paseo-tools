@@ -1,0 +1,27 @@
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Local agent tooling state
+.serena/
+.superpowers/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node (Paseo plugins under plugins/)
+node_modules/
+
+# Scratch space for live tests. Received files are data: keep them in the repo
+# that owns the work, not here.
+scratch/

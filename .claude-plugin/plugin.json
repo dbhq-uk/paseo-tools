@@ -1,0 +1,17 @@
+{
+  "name": "paseo-tools",
+  "description": "Skills for working with Paseo agents and its remote browser. ferry moves files and data between the operator's devices, including the Paseo browser, and the server, over a token-protected, tailnet-only HTTPS endpoint.",
+  "author": {
+    "name": "DBHQ",
+    "email": "dan@dbhq.uk"
+  },
+  "homepage": "https://dbhq.uk",
+  "repository": "https://github.com/dbhq-uk/paseo-tools",
+  "license": "MIT",
+  "keywords": [
+    "paseo",
+    "browser",
+    "file-transfer",
+    "tailscale"
+  ]
+}
