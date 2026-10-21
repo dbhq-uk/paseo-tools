@@ -28,3 +28,13 @@ updates:
       - dependencies
     commit-message:
       prefix: "chore"
+
+  - package-ecosystem: npm
+    directory: /plugins/secrets
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore"
