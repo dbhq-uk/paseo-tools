@@ -85,8 +85,8 @@ export class Broker {
     if (!pending) return Promise.resolve(undefined);
     if (pending.outcome.status !== "waiting") return Promise.resolve(pending.outcome);
     return new Promise((resolve) => {
+      // Not unref'd: someone is waiting on this, so it must keep the process alive.
       const timer = setTimeout(() => resolve(pending.outcome), waitMs);
-      timer.unref?.();
       pending.waiters.push((outcome) => {
         clearTimeout(timer);
         resolve(outcome);
