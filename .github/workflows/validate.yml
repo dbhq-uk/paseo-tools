@@ -1,0 +1,196 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+# A second push to the same branch cancels the first: CI should report on the
+# newest commit, not queue behind stale ones.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege at the top level so every job inherits it.
+permissions:
+  contents: read
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  # THE ESTATE FLOOR, defined once in dbhq-uk/.github: SKILL.md frontmatter
+  # parses as YAML and names its directory, plugin.json parses and carries no
+  # version, skill paths are braced, every shell script passes bash -n and
+  # shellcheck -S warning, ruff E9,F, and no em or en dashes. Pinned by SHA;
+  # Dependabot moves the pin.
+  floor:
+    uses: dbhq-uk/.github/.github/workflows/skill-floor.yml@af131df509f44eb9abfe8b37ad6299c11f496c5f
+    with:
+      dash-files: "*.md *.sh *.py *.yaml *.yml *.json"
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: shellcheck at every severity
+        # Stricter than the floor, which stops at -S warning. ./ prefixes so a
+        # filename beginning with a dash could never be read as an option.
+        run: |
+          shellcheck ./install.sh
+          find skills -name '*.sh' -print0 | xargs -0 -r shellcheck
+
+      # The install story rests on ${CLAUDE_SKILL_DIR} being substituted. A
+      # hardcoded ~/.claude/skills path works on the author's machine and is
+      # wrong under a plugin install. Asserted rather than trusted.
+      - name: No hardcoded install paths
+        run: |
+          if grep -rn '~/\.claude/skills\|\$HOME/\.claude/skills' skills/ README.md; then
+            echo "::error::Hardcoded install path found. Use \${CLAUDE_SKILL_DIR} in skills/, or a path from the repository root in README.md."
+            exit 1
+          fi
+          echo "No hardcoded install paths."
+
+      # ferry prints tokens to the terminal only. A real-looking URL with a
+      # token in a doc or a test is the realistic way one gets committed.
+      - name: No ferry tokens in the tree
+        run: |
+          if grep -rnE '\.ts\.net:[0-9]+/[A-Za-z0-9_-]{24,}' --include='*.md' --include='*.py' --include='*.sh' --include='*.yml' --include='*.json' . ; then
+            echo "::error::A ferry URL with a token is committed."
+            exit 1
+          fi
+          echo "No ferry tokens in the tree."
+
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - run: python -m pip install --upgrade pip ruff
+
+      - name: ruff check
+        # Config lives in pyproject.toml. target-version is py39, the floor.
+        run: ruff check --output-format=github .
+
+      - name: ruff format --check
+        run: ruff format --check .
+
+  tests:
+    name: tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Floor, middle, ceiling is enough to catch a syntax or stdlib regression.
+        python-version: ['3.9', '3.11', '3.13']
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install pytest
+        # The skills have no dependencies. pytest is for the suite only.
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run test suite
+        # No network and no Tailscale: the tests bind 127.0.0.1 on ephemeral ports.
+        run: python -m pytest skills -v -p no:cacheprovider
+
+  installers:
+    name: Installer actually installs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Claude install
+        run: |
+          ./install.sh
+          for dir in skills/*/; do
+            name="$(basename "$dir")"
+            test -L "$HOME/.claude/skills/$name" || { echo "$name: not a symlink"; exit 1; }
+            test -f "$HOME/.claude/skills/$name/SKILL.md" || { echo "$name: SKILL.md missing"; exit 1; }
+          done
+
+      - name: The installed ferry can run and answer
+        # A full receive round trip through the installed symlink, with no tailscale.
+        run: |
+          export XDG_STATE_HOME="$RUNNER_TEMP/state"
+          F="$HOME/.claude/skills/ferry/scripts/ferry.py"
+          python3 "$F" start --no-tailscale --dest "$RUNNER_TEMP/dest" --json > "$RUNNER_TEMP/info.json"
+          url="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['base_url'])" "$RUNNER_TEMP/info.json")"
+          echo hello > "$RUNNER_TEMP/in.txt"
+          curl -fsS -X POST --data-binary "@$RUNNER_TEMP/in.txt" "$url/up/in.txt"
+          cmp "$RUNNER_TEMP/in.txt" "$RUNNER_TEMP/dest/in.txt"
+          python3 "$F" stop
+
+      - name: No dangling symlinks
+        run: |
+          found=$(find "$HOME/.claude/skills/" -xtype l 2>/dev/null || true)
+          if [ -n "$found" ]; then echo "::error::dangling symlinks:"; echo "$found"; exit 1; fi
+          echo "No dangling symlinks."
+
+  # /plugin install and `npx skills add` copy the skill directory and run
+  # nothing. So the skill has to run from a bare copy, on a Python with no
+  # packages at all. This job is that install.
+  bare-copy:
+    name: Runs from a bare copy, no setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.9'
+
+      - name: The interpreter has no third-party packages to lean on
+        run: |
+          if python -c "import yaml" 2>/dev/null; then
+            echo "::error::PyYAML is importable, so this job would not prove anything"; exit 1
+          fi
+
+      - name: Copy the skill directory, run nothing, use it
+        run: |
+          copy="$RUNNER_TEMP/plugin/ferry"
+          mkdir -p "$(dirname "$copy")"
+          cp -R skills/ferry "$copy"
+          cd "$RUNNER_TEMP"
+          export XDG_STATE_HOME="$RUNNER_TEMP/state"
+          python "$copy/scripts/ferry.py" --help > /dev/null
+          python "$copy/scripts/ferry.py" start --no-tailscale --dest "$RUNNER_TEMP/dest" --json > info.json
+          url="$(python -c "import json; print(json.load(open('info.json'))['base_url'])")"
+          python -c "import urllib.request,sys; r=urllib.request.Request(sys.argv[1]+'/up/a.txt', data=b'x', method='POST'); print(urllib.request.urlopen(r).read())" "$url"
+          python "$copy/scripts/ferry.py" stop
+
+  # Single required check for branch protection. Adding a job above does not mean
+  # remembering to add it to the protection rule - it only needs listing here.
+  ci-ok:
+    name: CI OK
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - floor
+      - validate
+      - lint
+      - tests
+      - installers
+      - bare-copy
+    steps:
+      - name: Fail if any job did not succeed
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "job results: $results"
+          for r in $results; do
+            [ "$r" = "success" ] || { echo "::error::a job did not succeed"; exit 1; }
+          done
