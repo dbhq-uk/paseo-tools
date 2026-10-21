@@ -30,7 +30,7 @@ Claude Code, as a plugin:
 /plugin install paseo-tools
 ```
 
-Or from a clone, as live symlinks into `~/.claude/skills/`:
+Or from a clone, as live symlinks into your personal Claude Code skills folder:
 
 ```bash
 git clone https://github.com/dbhq-uk/paseo-tools.git
