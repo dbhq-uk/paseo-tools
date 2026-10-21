@@ -17,3 +17,14 @@ updates:
 
   # No pip entry. The skills use the Python standard library only, so there
   # is no requirements file for Dependabot to watch.
+
+  # Paseo plugins under plugins/ are Node projects with their own lockfile.
+  - package-ecosystem: npm
+    directory: /plugins/file-viewer
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore"
