@@ -1,0 +1,4 @@
+{
+  "id": "file-viewer",
+  "requirements": { "paseo": ">=0.8.0" }
+}
