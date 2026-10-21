@@ -10,8 +10,8 @@ import { createMcpServer } from "../server/mcp";
 
 const dir = join(mkdtempSync(join(tmpdir(), "secrets-mcp-")), "secrets");
 const connections = new Connections(join(dir, ".plugin-state.json"));
-const broker = new Broker({ dir, publish: async () => {} });
-const server = createMcpServer({ broker, connections, dir });
+const broker = new Broker({ dir, storage: "memory", publish: async () => {} });
+const server = createMcpServer({ broker, connections, dir, storage: "memory" });
 const token = connections.issue();
 connections.bind(token, "agent-1");
 let url = "";
@@ -79,6 +79,7 @@ test("request, then the operator saves: the agent gets a path and never the valu
   const reply = await asking;
   const text = reply.body.result.content[0].text as string;
   assert.match(text, /Stored STRIPE_KEY/);
+  assert.match(text, /held in memory/);
   assert.match(text, new RegExp(join(dir, "STRIPE_KEY").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.ok(!reply.raw.includes(canary), "the tool result must not contain the value");
   assert.equal(readFileSync(join(dir, "STRIPE_KEY"), "utf8"), canary);
@@ -116,9 +117,10 @@ test("await on an unknown request says so", async () => {
 test("when the timeline row cannot be shown, the agent is told and nothing is left open", async () => {
   const brokenDir = join(mkdtempSync(join(tmpdir(), "secrets-mcp-")), "secrets");
   const broken = createMcpServer({
-    broker: new Broker({ dir: brokenDir, publish: async () => { throw new Error("no paseo yet"); } }),
+    broker: new Broker({ dir: brokenDir, storage: "memory", publish: async () => { throw new Error("no paseo yet"); } }),
     connections,
     dir: brokenDir,
+    storage: "memory",
   });
   await new Promise<void>((resolve) => broken.listen(0, "127.0.0.1", resolve));
   try {

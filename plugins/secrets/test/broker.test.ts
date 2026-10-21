@@ -10,7 +10,7 @@ import { writeSecret } from "../server/store";
 function rig(ttlMs?: number) {
   const dir = join(mkdtempSync(join(tmpdir(), "secrets-broker-")), "secrets");
   const rows: Array<{ agentId: string; rowId: string; row: SecretRow }> = [];
-  const broker = new Broker({ dir, ttlMs, publish: async (agentId, rowId, row) => void rows.push({ agentId, rowId, row }) });
+  const broker = new Broker({ dir, storage: "memory", ttlMs, publish: async (agentId, rowId, row) => void rows.push({ agentId, rowId, row }) });
   return { dir, rows, broker };
 }
 
@@ -100,7 +100,7 @@ test("a closed or unknown request refuses a value and stores nothing", async () 
 
 test("if the box cannot be shown, the request fails at once and nothing stays open", async () => {
   const dir = join(mkdtempSync(join(tmpdir(), "secrets-broker-")), "secrets");
-  const broker = new Broker({ dir, publish: async () => { throw new Error("no paseo yet"); } });
+  const broker = new Broker({ dir, storage: "memory", publish: async () => { throw new Error("no paseo yet"); } });
   await assert.rejects(broker.request("agent-1", "K", "x"), /no paseo yet/);
 });
 
@@ -109,6 +109,7 @@ test("a failed later update does not lose a stored secret", async () => {
   let calls = 0;
   const broker = new Broker({
     dir,
+    storage: "memory",
     publish: async () => {
       if (++calls > 1) throw new Error("connection dropped");
     },

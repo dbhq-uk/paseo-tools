@@ -17,6 +17,8 @@ export const secretRowSchema = z.object({
   purpose: z.string(),
   status: z.enum(["waiting", "stored", "cancelled", "expired"]),
   replacing: z.boolean(),
+  /** Where the value will be kept, so the box can say so. */
+  storage: z.enum(["memory", "disk"]),
 });
 export type SecretRow = z.output<typeof secretRowSchema>;
 

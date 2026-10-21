@@ -1,10 +1,9 @@
-import { join } from "node:path";
 import type { PluginHandlerContext, PluginServerContext } from "@getpaseo/plugin/server";
 import { cancelSecret, SECRET_ROW_KIND, submitSecret } from "./shared/contracts";
 import { Broker } from "./server/broker";
 import { Connections } from "./server/connections";
 import { createMcpServer } from "./server/mcp";
-import { secretsDir } from "./server/store";
+import { locateStore, stateFile } from "./server/store";
 
 /** Providers where the injected MCP server has been shown to work. Others are left alone rather than risk a failed launch. */
 const PROVIDERS = new Set(["claude"]);
@@ -13,8 +12,9 @@ const TOOLS = ["request_secret", "await_secret", "list_secrets", "forget_secret"
 const TOKEN_ENV = "PASEO_SECRETS_CONN";
 
 export default function contribute(server: PluginServerContext) {
-  const dir = secretsDir();
-  const connections = new Connections(join(dir, ".plugin-state.json"));
+  const { dir, storage } = locateStore();
+  const connections = new Connections(stateFile());
+  console.log(`Secrets are kept in ${dir} (${storage === "memory" ? "RAM-backed, gone after a reboot" : "on disk"}).`);
   let paseo: PluginHandlerContext["paseo"] | undefined;
   const remember = (_: unknown, context: { paseo: NonNullable<typeof paseo> }) => {
     paseo = context.paseo;
@@ -22,6 +22,7 @@ export default function contribute(server: PluginServerContext) {
 
   const broker = new Broker({
     dir,
+    storage,
     async publish(agentId, rowId, row) {
       if (!paseo) throw new Error("the plugin has not seen an agent event since it started");
       await paseo.agents.ref(agentId).timeline.append({
@@ -34,7 +35,7 @@ export default function contribute(server: PluginServerContext) {
     },
   });
 
-  const http = createMcpServer({ broker, connections, dir });
+  const http = createMcpServer({ broker, connections, dir, storage });
   let port = connections.port ?? 0;
   const listen = (wanted: number) =>
     new Promise<void>((resolve, reject) => {

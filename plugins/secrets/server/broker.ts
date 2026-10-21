@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SecretRow } from "../shared/contracts";
-import { hasSecret, StoreError, writeSecret } from "./store";
+import { hasSecret, type Storage, StoreError, writeSecret } from "./store";
 
 export const REQUEST_TTL_MS = 15 * 60 * 1000;
 
@@ -22,6 +22,7 @@ interface Pending {
 
 export interface BrokerDeps {
   dir: string;
+  storage: Storage;
   /** Put the row in the agent's timeline, or replace it. The row holds no secret. */
   publish(agentId: string, rowId: string, row: SecretRow): Promise<void>;
   ttlMs?: number;
@@ -138,6 +139,7 @@ export class Broker {
       purpose: pending.purpose,
       status: pending.outcome.status,
       replacing: pending.replacing,
+      storage: this.deps.storage,
     });
   }
 

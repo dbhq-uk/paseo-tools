@@ -12,7 +12,7 @@ const DONE_TEXT: Record<Exclude<SecretRow["status"], "waiting">, string> = {
 };
 
 export function SecretRequest({ item, theme, layout }: PluginTimelineItemProps<SecretRow>) {
-  const { requestId, name, purpose, status, replacing } = item.data;
+  const { requestId, name, purpose, status, replacing, storage } = item.data;
   const submit = useRpc(submitSecret);
   const cancel = useRpc(cancelSecret);
   // The value lives in this component's state only, and is cleared once it is sent.
@@ -70,7 +70,11 @@ export function SecretRequest({ item, theme, layout }: PluginTimelineItemProps<S
     <View style={styles.card}>
       <Text style={styles.title}>{replacing ? `Replace ${name}?` : `The agent needs ${name}`}</Text>
       <Text style={styles.muted}>{purpose}</Text>
-      <Text style={styles.muted}>This goes to a protected file on the server. It is not sent to the chat.</Text>
+      <Text style={styles.muted}>
+        {storage === "memory"
+          ? "This is kept in the server's memory, not on disk, and is not sent to the chat. It is lost when the server reboots."
+          : "This is saved to a protected file on the server and is not sent to the chat."}
+      </Text>
       <TextInput
         accessibilityLabel={`Value for ${name}`}
         style={styles.input}

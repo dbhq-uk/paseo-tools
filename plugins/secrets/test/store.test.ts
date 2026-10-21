@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { listSecrets, pathFor, removeSecret, secretsDir, StoreError, writeSecret } from "../server/store";
+import { listSecrets, pathFor, locateStore, removeSecret, StoreError, stateFile, writeSecret } from "../server/store";
 
 const scratch = () => join(mkdtempSync(join(tmpdir(), "secrets-store-")), "secrets");
 const mode = (path: string) => statSync(path).mode & 0o777;
@@ -68,8 +68,58 @@ test("remove deletes the file and says whether there was one", () => {
   assert.throws(() => removeSecret(dir, "../K"), StoreError);
 });
 
-test("the folder follows PASEO_SECRETS_DIR, then PASEO_HOME, then the home directory", () => {
-  assert.equal(secretsDir({ PASEO_SECRETS_DIR: "/a" }), "/a");
-  assert.equal(secretsDir({ PASEO_HOME: "/h" }), "/h/secrets");
-  assert.match(secretsDir({}), /\.paseo\/secrets$/);
+const ram = (...bases: string[]) => (path: string) => bases.includes(path);
+
+test("an explicit folder wins and counts as disk", () => {
+  assert.deepEqual(locateStore({ env: { PASEO_SECRETS_DIR: "/a", PASEO_HOME: "/h" }, platform: "linux" }), {
+    dir: "/a",
+    storage: "disk",
+  });
+});
+
+test("PASEO_SECRETS_STORE=disk keeps secrets under the Paseo home", () => {
+  const env = { PASEO_HOME: "/h", PASEO_SECRETS_STORE: "disk", XDG_RUNTIME_DIR: "/run/user/7" };
+  assert.deepEqual(locateStore({ env, uid: 7, platform: "linux", ramBacked: ram("/run/user/7") }), {
+    dir: "/h/secrets",
+    storage: "disk",
+  });
+});
+
+test("by default a RAM-backed runtime folder is used, found by type and not by name", () => {
+  const env = { PASEO_HOME: "/h", XDG_RUNTIME_DIR: "/run/user/7" };
+  assert.deepEqual(locateStore({ env, uid: 7, platform: "linux", ramBacked: ram("/run/user/7") }), {
+    dir: "/run/user/7/paseo-secrets",
+    storage: "memory",
+  });
+});
+
+test("without XDG_RUNTIME_DIR it tries /run/user/<uid>, then /dev/shm with the uid in the name", () => {
+  const env = { PASEO_HOME: "/h" };
+  assert.equal(locateStore({ env, uid: 7, platform: "linux", ramBacked: ram("/run/user/7") }).dir, "/run/user/7/paseo-secrets");
+  assert.deepEqual(locateStore({ env, uid: 7, platform: "linux", ramBacked: ram("/dev/shm") }), {
+    dir: "/dev/shm/paseo-secrets-7",
+    storage: "memory",
+  });
+});
+
+test("a folder that is not RAM-backed is never called memory", () => {
+  const env = { PASEO_HOME: "/h", XDG_RUNTIME_DIR: "/run/user/7" };
+  assert.deepEqual(locateStore({ env, uid: 7, platform: "linux", ramBacked: () => false }), {
+    dir: "/h/secrets",
+    storage: "disk",
+  });
+});
+
+test("outside Linux it falls back to disk", () => {
+  assert.equal(locateStore({ env: { PASEO_HOME: "/h" }, platform: "darwin", ramBacked: () => true }).storage, "disk");
+});
+
+test("on this machine the real check agrees with the mounts", () => {
+  const found = locateStore({ env: { PASEO_HOME: "/h" } });
+  if (process.platform === "linux" && existsSync("/dev/shm")) assert.equal(found.storage, "memory");
+});
+
+test("plugin state lives under the Paseo home, on disk", () => {
+  assert.equal(stateFile({ PASEO_HOME: "/h" }), "/h/secrets-plugin-state.json");
+  assert.match(stateFile({}), /\.paseo\/secrets-plugin-state\.json$/);
 });

@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { NAME_PATTERN } from "../shared/contracts";
 import type { Broker, Outcome } from "./broker";
 import type { Connections } from "./connections";
-import { listSecrets, pathFor, removeSecret } from "./store";
+import { listSecrets, pathFor, removeSecret, type Storage } from "./store";
 
 const MAX_BODY_BYTES = 64 * 1024;
 export const MAX_WAIT_SECONDS = 45;
@@ -14,6 +14,7 @@ export interface McpDeps {
   broker: Broker;
   connections: Connections;
   dir: string;
+  storage: Storage;
 }
 
 const NAME_HELP =
@@ -61,12 +62,14 @@ function text(message: string, isError = false): Json {
   return { content: [{ type: "text", text: message }], ...(isError ? { isError: true } : {}) };
 }
 
-function describe(outcome: Outcome | undefined): Json {
+const MEMORY_NOTE = " It is held in memory, so it is gone after a reboot. If it is missing later, ask again.";
+
+function describe(outcome: Outcome | undefined, storage: Storage): Json {
   if (!outcome) return text("No such request. It may have been made before the plugin restarted. Ask again.", true);
   switch (outcome.status) {
     case "stored":
       return text(
-        `Stored ${outcome.name}. File: ${outcome.path}\nRead it where you need it, for example: export ${outcome.name}="$(cat "${outcome.path}")"\nDo not print it, log it, or copy it into the repository.`,
+        `Stored ${outcome.name}. File: ${outcome.path}\nRead it where you need it, for example: export ${outcome.name}="$(cat "${outcome.path}")"\nDo not print it, log it, or copy it into the repository.${storage === "memory" ? MEMORY_NOTE : ""}`,
       );
     case "waiting":
       return text(
@@ -99,12 +102,12 @@ async function callTool(deps: McpDeps, agentId: string, name: string, args: Json
           true,
         );
       }
-      if (opened.status !== "waiting") return describe(opened);
-      return describe(await deps.broker.wait(opened.requestId, waitMs(undefined)));
+      if (opened.status !== "waiting") return describe(opened, deps.storage);
+      return describe(await deps.broker.wait(opened.requestId, waitMs(undefined)), deps.storage);
     }
     case "await_secret": {
       const requestId = typeof args.requestId === "string" ? args.requestId : "";
-      return describe(await deps.broker.wait(requestId, waitMs(args.waitSeconds)));
+      return describe(await deps.broker.wait(requestId, waitMs(args.waitSeconds)), deps.storage);
     }
     case "list_secrets": {
       const names = listSecrets(deps.dir);
