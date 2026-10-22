@@ -53,9 +53,9 @@ LibreOffice is not used at all. It was in an earlier draft of this design and th
 
 **What this costs.** Exact layout is lost for Office documents: fonts, positioning, headers and footers, page numbers, where a signature block sits.
 
-That sounds worse than it is, and the corpus is the reason. All ten `.docx` files are working documents - a CV and personal statement, legal complaint drafts and evidence summaries, two years of P11D workings. **Not one signed contract is a `.docx`**; every executed agreement in the corpus is already a PDF, and PDFs keep their exact layout because they take the rasterise path. So the loss applies only to documents you would want to reflow on a phone anyway.
+That sounds worse than it is, and the sample set is the reason. All ten `.docx` files are working documents - a CV and personal statement, legal complaint drafts and evidence summaries, two years of P11D workings. **Not one signed contract is a `.docx`**; every executed agreement in the sample set is already a PDF, and PDFs keep their exact layout because they take the rasterise path. So the loss applies only to documents you would want to reflow on a phone anyway.
 
-Legacy `.doc` is unsupported, since `mammoth` reads only `.docx`. The corpus contains none. See Non-goals.
+Legacy `.doc` is unsupported, since `mammoth` reads only `.docx`. The sample set contains none. See Non-goals.
 
 ## Components
 
@@ -89,7 +89,7 @@ Four contracts, Zod-validated in both directions.
 
 **`doc.page`** - input `{ workspaceId, relPath, page, dpi }`, output `{ dataUri, width, height }`. One rasterised page. Used by `pdf` and `image` only.
 
-**`doc.rows`** - input `{ workspaceId, relPath, sheet, offset, limit }`, output `{ rows, total }`. A window of cells. Needed because sheets in the target corpus reach 224 rows by 147 columns, which is too wide and too tall to ship or render at once.
+**`doc.rows`** - input `{ workspaceId, relPath, sheet, offset, limit }`, output `{ rows, total }`. A window of cells. Needed because sheets in the target set reach 224 rows by 147 columns, which is too wide and too tall to ship or render at once.
 
 The client fetches pages and row windows as they scroll into view through TanStack Query, so a 200-page PDF or a 10,000-row sheet costs one screen of work.
 
@@ -106,12 +106,12 @@ Block  = { type: 'heading', level, runs }
 Run    = { text, bold?, italic?, link? }
 ```
 
-This shape was derived by running `mammoth` over all ten `.docx` files in the corpus, not one. The union is fifteen tags: `p`, `strong`, `em`, `a`, `br`, `h1`, `h2`, `h3`, `ul`, `ol`, `li`, `table`, `tr`, `td`, `img`.
+This shape was derived by running `mammoth` over all ten `.docx` files in the sample set, not one. The union is fifteen tags: `p`, `strong`, `em`, `a`, `br`, `h1`, `h2`, `h3`, `ul`, `ol`, `li`, `table`, `tr`, `td`, `img`.
 
 Three of those are easy to miss and each would cause a visible defect:
 
 - **`img`** - **the P11D calculations document is five pasted screenshots and no text at all.** Strip images and it renders as a blank page. `mammoth` inlines them as base64 PNG data URIs, which `<Image source={{uri}}>` takes directly, so this is a block type rather than any real work
-- **`a`** - 140 links across the corpus, mostly in the CVs. A run without `link` silently drops them
+- **`a`** - 140 links across the sample set, mostly in the CVs. A run without `link` silently drops them
 - **`br`** - a line break inside a paragraph, which becomes a newline in the run text rather than a new block, so address lines and sign-offs keep their shape
 
 Headings collapse `h1`-`h3` into `level`, and `ul`/`ol` into `ordered`. Anything outside this set degrades to a plain paragraph rather than failing.
@@ -158,26 +158,26 @@ Every case below surfaces as readable text in the panel and is logged to stdout,
 
 ## Cache
 
-Rasterised PNGs are written under `os.tmpdir()/paseo-file-viewer/`, keyed by a hash of realpath, mtime, size, page and DPI - so editing a file invalidates its pages without any watching. The cache is bounded at 500MB and evicted least-recently-used.
+Rasterised PNGs are written to `$XDG_CACHE_HOME/paseo-file-viewer` (normally `~/.cache/paseo-file-viewer`, or `PASEO_FILE_VIEWER_CACHE`), a folder at mode 0700 that must belong to the user, because the pages are private documents and the shared temp folder is readable by every local user. Files are written under a temporary name and renamed, and requests for one page at the same moment share one render. They are keyed by a hash of realpath, mtime, size, page and DPI - so editing a file invalidates its pages without any watching. The cache is bounded at 500MB and evicted least-recently-used.
 
-Parsed Office output is not cached to disk. At 107ms and 411ms it is cheaper to reparse than to manage another cache, and TanStack Query already holds it for the life of the panel.
+Parsed Office output is not cached to disk. Parsed workbooks are kept in memory, the last three, keyed by path, mtime and size, because every screenful of rows asks for another window of the same sheet. Office files over 50 MB are refused before they are read, and a sheet's rows and columns are counted from cells that hold something, so formatting far from the data does not make a sheet look a million rows long.
 
 ## Testing
 
 `server/` is plain Node with no Paseo coupling, so it tests directly against fixture files - one per kind, plus an encrypted PDF, a corrupt file, a legacy `.doc` and a symlink pointing outside the workspace.
 
-The path guard, the cache key, the block mapping and the row windowing get explicit tests. The block mapping is tested against all fifteen tags in the corpus union, with a specific case asserting that an image-only document produces image blocks rather than an empty page. The client components are thin enough to verify by eye across a wide desktop window, a compact mobile client and both themes.
+The path guard, the cache key, the block mapping and the row windowing get explicit tests. The block mapping is tested against all fifteen tags in the sample set union, with a specific case asserting that an image-only document produces image blocks rather than an empty page. The client components are thin enough to verify by eye across a wide desktop window, a compact mobile client and both themes.
 
 ## Non-goals
 
 - **Text, code and markdown** - Paseo's files panel already renders them
-- **Exact page layout for Office documents** - a deliberate trade for speed and mobile reflow. No signed contract in the corpus is a `.docx`, so nothing that needs layout fidelity takes this path
-- **Legacy `.doc`, `.xls`, `.ppt`** - the corpus has none, and supporting them means reintroducing LibreOffice. Detected by magic bytes and reported as unsupported, so one arriving later gives a clear message rather than a crash
-- **PowerPoint** - no `.pptx` in the corpus
-- **Video and audio** - would need ffmpeg, which is not installed, and there are no media files in the corpus
+- **Exact page layout for Office documents** - a deliberate trade for speed and mobile reflow. No signed contract in the sample set is a `.docx`, so nothing that needs layout fidelity takes this path
+- **Legacy `.doc`, `.xls`, `.ppt`** - the sample set has none, and supporting them means reintroducing LibreOffice. Detected by magic bytes and reported as unsupported, so one arriving later gives a clear message rather than a crash
+- **PowerPoint** - no `.pptx` in the sample set
+- **Video and audio** - would need ffmpeg, which is not installed, and there are no media files in the sample set
 - **Editing, annotation, OCR, search within a document** - read-only viewer
 - **Files outside the workspace** - deliberate, see Path safety
 
 ## Open items
 
-- Whether HTML should render through headless Chrome, which is installed. Left out of v1: the HTML in the target corpus is build output rather than anything worth reading
+- Whether HTML should render through headless Chrome, which is installed. Left out of v1: the HTML in the target set is build output rather than anything worth reading

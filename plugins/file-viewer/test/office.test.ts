@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import ExcelJS from "exceljs";
+import { mkdtemp, truncate, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { readDocument, readRows, readSheetList } from "../server/office.js";
+import { MAX_OFFICE_BYTES, readDocument, readRows, readSheetList } from "../server/office.js";
 import type { Block, Run } from "../shared/contracts.js";
 
 const fixtures = new URL("./fixtures/", import.meta.url).pathname;
@@ -137,5 +140,52 @@ describe("readRows", () => {
 
   it("rejects an unknown sheet by name", async () => {
     await assert.rejects(() => readRows(at("invoices.xlsx"), "Nope", 0, 10), /No sheet named/);
+  });
+});
+
+describe("limits on Office files", () => {
+  it("refuses a file over the size cap before reading it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fv-big-"));
+    for (const name of ["huge.docx", "huge.xlsx"]) {
+      const file = join(dir, name);
+      await writeFile(file, "");
+      await truncate(file, MAX_OFFICE_BYTES + 1); // sparse: no real disk used
+      const open = name.endsWith("docx") ? readDocument(file) : readSheetList(file);
+      await assert.rejects(open, /opens Office files up to 50 MB/);
+    }
+  });
+
+  it("counts only rows and columns that hold something, not styled empty cells", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fv-extent-"));
+    const file = join(dir, "styled.xlsx");
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Data");
+    ws.getCell("A1").value = "name";
+    ws.getCell("B2").value = 42;
+    // Formatting far from the data, as a whole-column or whole-row style leaves behind.
+    ws.getCell("Z1000").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFF0000" } };
+    await wb.xlsx.writeFile(file);
+
+    assert.deepEqual(await readSheetList(file), [{ name: "Data", rowCount: 2, colCount: 2 }]);
+    const window = await readRows(file, "Data", 0, 500);
+    assert.equal(window.total, 2);
+    assert.deepEqual(window.rows, [["name", ""], ["", "42"]]);
+  });
+
+  it("reads a later window of rows without losing the earlier ones", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fv-window-"));
+    const file = join(dir, "long.xlsx");
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Long");
+    for (let n = 1; n <= 450; n += 1) ws.addRow([`row ${n}`]);
+    await wb.xlsx.writeFile(file);
+
+    const first = await readRows(file, "Long", 0, 200);
+    const second = await readRows(file, "Long", 200, 200);
+    const third = await readRows(file, "Long", 400, 200);
+    assert.deepEqual([first.rows.length, second.rows.length, third.rows.length], [200, 200, 50]);
+    assert.equal(second.rows[0][0], "row 201");
+    assert.equal(third.rows.at(-1)?.[0], "row 450");
+    assert.equal(third.total, 450);
   });
 });

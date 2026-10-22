@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { copyFile, utimes, mkdtemp } from "node:fs/promises";
+import { copyFile, mkdtemp, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { describe, it } from "node:test";
-import { imageInfo, pdfInfo, renderPage } from "../server/raster.js";
+import { cacheDir, imageInfo, magickInput, pdfInfo, pngSize, renderPage } from "../server/raster.js";
 
 /**
  * AVIF needs an ImageMagick built with libheif, which many CI images lack.
@@ -117,5 +117,67 @@ describe("renderPage", () => {
 
   it("refuses a page beyond the end of the document", async () => {
     await assert.rejects(() => renderPage(at("statement.pdf"), "pdf", 99, 110));
+  });
+});
+
+describe("the page cache", () => {
+  it("is a private folder in the user's cache, not the shared temp folder", async () => {
+    const root = await mkdtemp(join(tmpdir(), "fv-private-"));
+    process.env.PASEO_FILE_VIEWER_CACHE = join(root, "cache");
+    try {
+      await renderPage(at("statement.pdf"), "pdf", 1, 110);
+      assert.equal(cacheDir(), join(root, "cache"));
+      assert.equal((await stat(cacheDir())).mode & 0o777, 0o700);
+    } finally {
+      delete process.env.PASEO_FILE_VIEWER_CACHE;
+    }
+    assert.ok(!cacheDir().startsWith(tmpdir()), "the default must not be under the temp folder");
+  });
+
+  it("gives every simultaneous request for one page a complete image", async () => {
+    const root = await mkdtemp(join(tmpdir(), "fv-race-"));
+    process.env.PASEO_FILE_VIEWER_CACHE = join(root, "cache");
+    try {
+      const pages = await Promise.all(Array.from({ length: 8 }, () => renderPage(at("statement.pdf"), "pdf", 2, 150)));
+      for (const page of pages) {
+        const bytes = Buffer.from(page.dataUri.split(",")[1], "base64");
+        assert.deepEqual(pngSize(bytes), { width: page.width, height: page.height });
+        assert.equal(page.dataUri, pages[0].dataUri);
+      }
+    } finally {
+      delete process.env.PASEO_FILE_VIEWER_CACHE;
+    }
+  });
+});
+
+describe("image dimensions", () => {
+  it("reports the real size of a native image passed through untouched", async () => {
+    const page = await renderPage(at("photo.png"), "image", 1, 150);
+    assert.deepEqual({ width: page.width, height: page.height }, { width: 400, height: 300 });
+  });
+
+  it("reads a PNG header, and refuses anything else", () => {
+    const header = Buffer.alloc(24);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header);
+    header.writeUInt32BE(640, 16);
+    header.writeUInt32BE(480, 20);
+    assert.deepEqual(pngSize(header), { width: 640, height: 480 });
+    assert.equal(pngSize(Buffer.from("not a png at all, just text")), null);
+  });
+});
+
+describe("untrusted images", () => {
+  it("decodes by the file's extension, not by what the file claims to be", () => {
+    assert.equal(magickInput("/a/b.PNG"), "png:/a/b.PNG[0]");
+    assert.equal(magickInput("/a/b.jpg"), "jpeg:/a/b.jpg[0]");
+    assert.equal(magickInput("/a/b.avif"), "avif:/a/b.avif[0]");
+    assert.throws(() => magickInput("/a/b.mvg"), /cannot be read/);
+  });
+
+  it("does not run a drawing script that is named like a PNG", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fv-evil-"));
+    const file = join(dir, "evil.png");
+    await writeFile(file, "push graphic-context\nviewbox 0 0 10 10\nfill 'red'\nrectangle 0,0 10,10\npop graphic-context\n");
+    await assert.rejects(() => imageInfo(file));
   });
 });

@@ -1,6 +1,6 @@
 import { useRpc } from "@getpaseo/plugin/client";
-import { useQuery } from "@tanstack/react-query";
-import React, { useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import React, { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from "react-native";
 import { getRows, type SheetMeta } from "../shared/contracts.js";
 import type { Styles } from "./theme.js";
@@ -16,12 +16,20 @@ interface Props {
 
 export function SheetReader({ workspaceId, relPath, sheets, styles }: Props) {
   const [active, setActive] = useState(sheets[0]?.name ?? "");
-  const [limit, setLimit] = useState(PAGE_SIZE);
   const fetchRows = useRpc(getRows);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["rows", workspaceId, relPath, active, limit],
-    queryFn: () => fetchRows({ workspaceId, relPath, sheet: active, offset: 0, limit }),
+  // Each screenful is its own request, appended to the rows already shown. Changing
+  // one query key as the limit grew threw the list away and sent the reader back to
+  // the top every time they reached the bottom.
+  const { data, isLoading, error, hasNextPage, isFetchingNextPage, fetchNextPage } = useInfiniteQuery({
+    queryKey: ["rows", workspaceId, relPath, active],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      fetchRows({ workspaceId, relPath, sheet: active, offset: pageParam, limit: PAGE_SIZE }),
+    getNextPageParam: (last, all) => {
+      const loaded = all.reduce((n, part) => n + part.rows.length, 0);
+      return last.rows.length > 0 && loaded < last.total ? loaded : undefined;
+    },
     enabled: Boolean(active),
   });
 
@@ -33,8 +41,8 @@ export function SheetReader({ workspaceId, relPath, sheets, styles }: Props) {
     );
   }
 
-  const rows = data?.rows ?? [];
-  const total = data?.total ?? 0;
+  const rows = useMemo(() => data?.pages.flatMap((part) => part.rows) ?? [], [data]);
+  const total = data?.pages[0]?.total ?? 0;
 
   return (
     <View style={styles.screen}>
@@ -47,7 +55,6 @@ export function SheetReader({ workspaceId, relPath, sheets, styles }: Props) {
             key={sheet.name}
             onPress={() => {
               setActive(sheet.name);
-              setLimit(PAGE_SIZE);
             }}
             style={sheet.name === active ? styles.buttonOn : styles.button}
             accessibilityRole="button"
@@ -70,7 +77,7 @@ export function SheetReader({ workspaceId, relPath, sheets, styles }: Props) {
             data={rows}
             keyExtractor={(_, i) => String(i)}
             onEndReached={() => {
-              if (rows.length < total) setLimit((n) => Math.min(n + PAGE_SIZE, total));
+              if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
             }}
             onEndReachedThreshold={0.6}
             ListFooterComponent={
