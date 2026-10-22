@@ -48,6 +48,6 @@ Even if it works, this depends on the app's DOM ids, which are not a plugin API,
 ## Recommendation
 
 1. Keep ferry for the browser case. Nothing short of a change in Paseo replaces it.
-2. Tell agents that a file the operator wants to hand over can be attached in the composer. It uses the paired transport and needs no setup. Add a line to the ferry skill.
+2. Once someone has attached a file in the composer and confirmed the agent gets a usable path, add a line to the ferry skill saying so. It uses the paired transport and needs no setup. I have not added it, because I have not seen it work.
 3. Ask Paseo for browser-tab downloads to be saved into the workspace through the existing upload frames. It would also fix `browser_upload` for remote daemons. This is a feature request, which Paseo takes in Discussions, not Issues.
 4. Do not build a plugin that reaches into the app's DOM unless the spike proves the DOM is there and Paseo accepts that as supported.
