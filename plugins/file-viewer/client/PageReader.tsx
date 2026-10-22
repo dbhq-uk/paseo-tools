@@ -1,7 +1,7 @@
 import { useRpc } from "@getpaseo/plugin/client";
 import { useQuery } from "@tanstack/react-query";
-import React, { useState } from "react";
-import { ActivityIndicator, Image, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import React, { useMemo, useState } from "react";
+import { ActivityIndicator, FlatList, Image, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { getPage, ZOOM } from "../shared/contracts.js";
 import type { Styles } from "./theme.js";
 
@@ -19,6 +19,8 @@ function Page({ workspaceId, relPath, page, dpi, styles, maxWidth }: Props & { p
   const { data, isLoading, error } = useQuery({
     queryKey: ["page", workspaceId, relPath, page, dpi],
     queryFn: () => fetchPage({ workspaceId, relPath, page, dpi }),
+    // A page is a megabyte or more of base64. Drop it soon after it scrolls away.
+    gcTime: 60_000,
   });
 
   if (isLoading) {
@@ -58,6 +60,7 @@ export function PageReader({ workspaceId, relPath, pages, styles }: Omit<Props, 
   // the reader scrolls sideways. This replaces pinch-zoom, which React Native
   // only supports on iOS and which needs a gesture library we cannot import.
   const contentWidth = Math.round(windowWidth * (dpi / ZOOM[0].dpi));
+  const pageNumbers = useMemo(() => Array.from({ length: pages }, (_, i) => i + 1), [pages]);
 
   return (
     <View style={styles.screen}>
@@ -76,12 +79,22 @@ export function PageReader({ workspaceId, relPath, pages, styles }: Omit<Props, 
           </Text>
         ))}
       </View>
-      <ScrollView horizontal={contentWidth > windowWidth} contentContainerStyle={{ alignItems: "center" }}>
-        <ScrollView contentContainerStyle={{ alignItems: "center", padding: styles.pad }}>
-          {Array.from({ length: pages }, (_, i) => (
+      <ScrollView horizontal={contentWidth > windowWidth}>
+        {/* A list, not a ScrollView of every page: only the pages near the screen are
+            mounted, so only those are rendered on the server. A 200-page PDF costs a
+            few pages of work at a time. */}
+        <FlatList
+          style={{ width: contentWidth }}
+          contentContainerStyle={{ alignItems: "center", padding: styles.pad }}
+          data={pageNumbers}
+          keyExtractor={(n) => String(n)}
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          windowSize={5}
+          removeClippedSubviews
+          renderItem={({ item }) => (
             <Page
-              key={i}
-              page={i + 1}
+              page={item}
               workspaceId={workspaceId}
               relPath={relPath}
               pages={pages}
@@ -89,8 +102,8 @@ export function PageReader({ workspaceId, relPath, pages, styles }: Omit<Props, 
               styles={styles}
               maxWidth={contentWidth - styles.pad * 2}
             />
-          ))}
-        </ScrollView>
+          )}
+        />
       </ScrollView>
     </View>
   );

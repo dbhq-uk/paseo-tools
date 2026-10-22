@@ -18,6 +18,8 @@ const BY_EXTENSION: Record<string, FileKind> = {
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", ".cache", ".next", "venv", ".venv", "__pycache__"]);
 const MAX_FILES = 5000;
+/** Entries looked at, matching or not. A workspace that is really a home folder must not be walked for ever. */
+const MAX_VISITED = 100_000;
 
 export function kindFor(path: string): FileKind | null {
   return BY_EXTENSION[extname(path).toLowerCase()] ?? null;
@@ -63,9 +65,10 @@ export async function assertPdf(file: string): Promise<void> {
 /** Walks the workspace and returns every file the viewer can render. */
 export async function scanWorkspace(root: string): Promise<FileEntry[]> {
   const found: FileEntry[] = [];
+  let visited = 0;
 
   async function walk(dir: string): Promise<void> {
-    if (found.length >= MAX_FILES) return;
+    if (found.length >= MAX_FILES || visited >= MAX_VISITED) return;
     let items;
     try {
       items = await readdir(dir, { withFileTypes: true });
@@ -73,7 +76,7 @@ export async function scanWorkspace(root: string): Promise<FileEntry[]> {
       return; // unreadable directory is skipped, not fatal
     }
     for (const item of items) {
-      if (found.length >= MAX_FILES) return;
+      if (found.length >= MAX_FILES || ++visited >= MAX_VISITED) return;
       const full = join(dir, item.name);
       if (item.isDirectory()) {
         if (SKIP_DIRS.has(item.name) || item.name.startsWith(".")) continue;

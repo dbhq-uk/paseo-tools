@@ -24,7 +24,7 @@ const Run = z.object({
 export type Run = z.infer<typeof Run>;
 
 /**
- * Five block types cover the fifteen tags mammoth emits across the corpus.
+ * Five block types cover the fifteen tags mammoth emits across the sample documents.
  * `image` is load-bearing: some .docx files are pasted screenshots with no
  * text at all, and would otherwise render as a blank page.
  */
@@ -63,11 +63,11 @@ export const openDoc = defineRpc({
 /** One rasterised page as a PNG data URI. `pdf` and `image` only. */
 export const getPage = defineRpc({
   name: "doc.page",
-  input: z.object({ ...target, page: z.number().int().min(1), dpi: z.number().int().min(36).max(600) }),
+  input: z.object({ ...target, page: z.number().int().min(1), dpi: z.number().int().min(36).max(300) }),
   output: z.object({ dataUri: z.string(), width: z.number(), height: z.number() }),
 });
 
-/** A window of spreadsheet cells. Sheets reach 224 rows by 147 columns in the corpus. */
+/** A window of spreadsheet cells. Sheets reach 224 rows by 147 columns in the sample documents. */
 export const getRows = defineRpc({
   name: "doc.rows",
   input: z.object({

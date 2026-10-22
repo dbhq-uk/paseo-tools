@@ -38,7 +38,7 @@ Plugins must be enabled on the daemon (`pluginsEnabled: true` in `~/.paseo/confi
 
 Plugin client bundles may only import `react`, `react-native`, `@tanstack/react-query`, `zod` and `@getpaseo/plugin`. No pdf.js, no canvas, no gesture library. So the daemon does the work and the client renders the result.
 
-**PDFs and images are rasterised.** `pdftoppm` renders one page at a time at a requested DPI, cached on disk by path, mtime, size, page and DPI. The client requests pages as they scroll into view, so a 200-page document costs one page of work.
+**PDFs and images are rasterised.** `pdftoppm` renders one page at a time at a requested DPI, cached on disk by path, mtime, size, page and DPI, in a private folder under `~/.cache/paseo-file-viewer`. The pages are a virtualised list, so only the pages near the screen are mounted and requested, and a 200-page document costs a few pages of work at a time.
 
 **Word documents and spreadsheets are parsed, not rasterised.** This is the design decision the plugin turns on, and it was measured rather than assumed:
 
@@ -59,6 +59,8 @@ React Native's `maximumZoomScale` is iOS-only, and a plugin cannot import a gest
 
 The viewer is scoped to the current workspace. The backend resolves the workspace directory from its id rather than accepting a path from the client, and every request is `realpath`-ed and rejected unless it lands inside that root - which catches `../` traversal and symlinks pointing out of the tree.
 
+Files in a workspace are often downloads, so they are treated as untrusted. Images are decoded by ImageMagick using the coder named by the file extension, so a drawing script saved as `.png` is rejected and not run. Office files over 50 MB are refused, and rendered pages are cached in a private folder (`~/.cache/paseo-file-viewer`, mode 0700), not in the shared temp folder.
+
 This matters because **Paseo plugins are trusted, unsandboxed code**. The backend half runs as a subprocess with your full user rights. Nothing here is a substitute for reading the source before you install it.
 
 ## Development
@@ -72,7 +74,7 @@ paseo plugin reload file-viewer
 paseo plugin logs file-viewer
 ```
 
-`server/` is plain Node with no Paseo coupling, so it tests directly - 75 tests covering the path guard, format detection, the block mapping, cell rendering, the rasteriser and cache, and the RPC schemas.
+`server/` is plain Node with no Paseo coupling, so it tests directly - 84 tests covering the path guard, format detection, the block mapping, cell rendering, the rasteriser and cache, and the RPC schemas.
 
 **Fixtures are committed**, so the suite runs anywhere with only `poppler-utils`, `imagemagick` and `librsvg2-bin` installed. They are invented documents - a fictional consulting agreement, invoice workbook and account statement, plus deliberately malformed files for the refusal paths. No real document appears in this repository.
 

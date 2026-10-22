@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import mammoth from "mammoth";
 import ExcelJS from "exceljs";
 import { parse, type HTMLElement, type Node } from "node-html-parser";
@@ -68,7 +69,10 @@ function merge(runs: Run[]): Run[] {
 
 function imageBlock(el: HTMLElement): Block | null {
   const src = el.getAttribute("src");
-  if (!src) return null;
+  // mammoth embeds images as data URIs. Anything else would make the client
+  // fetch a remote address when a document is opened, which tells that server
+  // who read it.
+  if (!src || !src.startsWith("data:image/")) return null;
   const alt = el.getAttribute("alt");
   return { type: "image", dataUri: src, ...(alt ? { alt } : {}) };
 }
@@ -116,8 +120,23 @@ function blocksFrom(el: HTMLElement): Block[] {
   return blocks;
 }
 
+/**
+ * Office files are zip archives, and a small one can expand to a very large one.
+ * A cap on the file itself is the cheap guard: the parsers read the whole thing
+ * into memory, in a process that shares the daemon host.
+ */
+export const MAX_OFFICE_BYTES = 50 * 1024 * 1024;
+
+async function assertSize(file: string): Promise<void> {
+  const { size } = await stat(file);
+  if (size > MAX_OFFICE_BYTES) {
+    throw new Error(`This file is ${Math.round(size / 1024 / 1024)} MB. The viewer opens Office files up to ${MAX_OFFICE_BYTES / 1024 / 1024} MB.`);
+  }
+}
+
 /** Converts a .docx into the block tree the client renders natively. */
 export async function readDocument(file: string): Promise<Block[]> {
+  await assertSize(file);
   await assertOoxml(file);
   const { value: html } = await mammoth.convertToHtml({ path: file });
   const root = parse(html);
@@ -129,19 +148,60 @@ export async function readDocument(file: string): Promise<Block[]> {
   return blocks;
 }
 
-async function loadWorkbook(file: string): Promise<ExcelJS.Workbook> {
+interface Loaded {
+  workbook: ExcelJS.Workbook;
+  /** Rows and columns that hold something. Styled empty cells can make exceljs report a million rows. */
+  extent: Map<string, { rows: number; cols: number }>;
+}
+
+/** A window of rows is requested again for every screenful, and parsing a workbook is the slow part. */
+const WORKBOOKS = new Map<string, Promise<Loaded>>();
+const WORKBOOK_SLOTS = 3;
+
+async function parseWorkbook(file: string): Promise<Loaded> {
+  await assertSize(file);
   await assertOoxml(file);
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile(file);
-  return wb;
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(file);
+  const extent = new Map<string, { rows: number; cols: number }>();
+  for (const ws of workbook.worksheets) {
+    let rows = 0;
+    let cols = 0;
+    ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+        if (cellText(cell.value) === "") return;
+        rows = Math.max(rows, rowNumber);
+        cols = Math.max(cols, colNumber);
+      });
+    });
+    extent.set(ws.name, { rows, cols });
+  }
+  return { workbook, extent };
+}
+
+async function loadWorkbook(file: string): Promise<Loaded> {
+  const info = await stat(file);
+  const key = [file, info.mtimeMs, info.size].join("\0");
+  let loaded = WORKBOOKS.get(key);
+  if (!loaded) {
+    loaded = parseWorkbook(file);
+    WORKBOOKS.set(key, loaded);
+    loaded.catch(() => WORKBOOKS.delete(key));
+    while (WORKBOOKS.size > WORKBOOK_SLOTS) WORKBOOKS.delete(WORKBOOKS.keys().next().value as string);
+  } else {
+    // Move to the back, so the oldest is the one dropped.
+    WORKBOOKS.delete(key);
+    WORKBOOKS.set(key, loaded);
+  }
+  return await loaded;
 }
 
 export async function readSheetList(file: string): Promise<SheetMeta[]> {
-  const wb = await loadWorkbook(file);
-  return wb.worksheets.map((ws) => ({
+  const { workbook, extent } = await loadWorkbook(file);
+  return workbook.worksheets.map((ws) => ({
     name: ws.name,
-    rowCount: ws.rowCount ?? 0,
-    colCount: ws.columnCount ?? 0,
+    rowCount: extent.get(ws.name)?.rows ?? 0,
+    colCount: extent.get(ws.name)?.cols ?? 0,
   }));
 }
 
@@ -176,14 +236,14 @@ export interface RowWindow {
   total: number;
 }
 
-/** Returns a window of cells. Sheets in the corpus reach 224 rows by 147 columns. */
+/** Returns a window of cells. Sheets reach 224 rows by 147 columns in the sample workbooks. */
 export async function readRows(file: string, sheetName: string, offset: number, limit: number): Promise<RowWindow> {
-  const wb = await loadWorkbook(file);
-  const ws = wb.getWorksheet(sheetName);
+  const { workbook, extent } = await loadWorkbook(file);
+  const ws = workbook.getWorksheet(sheetName);
   if (!ws) throw new Error(`No sheet named "${sheetName}"`);
 
-  const total = ws.rowCount ?? 0;
-  const cols = ws.columnCount ?? 0;
+  const total = extent.get(ws.name)?.rows ?? 0;
+  const cols = extent.get(ws.name)?.cols ?? 0;
   const rows: string[][] = [];
 
   for (let n = offset + 1; n <= Math.min(offset + limit, total); n += 1) {

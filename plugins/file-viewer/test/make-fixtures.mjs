@@ -2,7 +2,7 @@
  * Regenerates the checked-in test fixtures.
  *
  * Every fixture is invented. No real document, client, person or figure
- * appears here - this repository is public, and the corpus the plugin was
+ * appears here - this repository is public, and the sample set the plugin was
  * built against is not.
  *
  * The fixtures ARE committed, so the suite runs anywhere without pandoc,
