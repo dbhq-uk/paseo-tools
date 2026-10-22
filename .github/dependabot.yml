@@ -22,8 +22,12 @@ updates:
   - package-ecosystem: npm
     directory: /plugins/file-viewer
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
+    # One pull request for the month's minor and patch updates, so the lockfile
+    # is changed once and the checks run once.
+    groups:
+      dev-dependencies:
+        update-types: ["minor", "patch"]
     labels:
       - dependencies
     commit-message:
@@ -47,8 +51,12 @@ updates:
   - package-ecosystem: npm
     directory: /plugins/secrets
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
+    # One pull request for the month's minor and patch updates, so the lockfile
+    # is changed once and the checks run once.
+    groups:
+      dev-dependencies:
+        update-types: ["minor", "patch"]
     labels:
       - dependencies
     commit-message:
