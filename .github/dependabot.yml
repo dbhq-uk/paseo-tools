@@ -28,6 +28,21 @@ updates:
       - dependencies
     commit-message:
       prefix: "chore"
+    ignore:
+      # Paseo supplies react and react-native to a plugin at runtime, and the
+      # scaffold pins them. These dev dependencies are only types for that host,
+      # so they move when Paseo's own scaffold does, by hand.
+      - dependency-name: "react"
+      - dependency-name: "react-native"
+      - dependency-name: "@types/react"
+      # Types for the Node the plugin subprocess runs under, kept at the floor.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # Paseo's scaffold uses TypeScript 5.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # The host library follows Paseo releases, on purpose and by hand.
+      - dependency-name: "@getpaseo/plugin"
 
   - package-ecosystem: npm
     directory: /plugins/secrets
@@ -38,3 +53,18 @@ updates:
       - dependencies
     commit-message:
       prefix: "chore"
+    ignore:
+      # Paseo supplies react and react-native to a plugin at runtime, and the
+      # scaffold pins them. These dev dependencies are only types for that host,
+      # so they move when Paseo's own scaffold does, by hand.
+      - dependency-name: "react"
+      - dependency-name: "react-native"
+      - dependency-name: "@types/react"
+      # Types for the Node the plugin subprocess runs under, kept at the floor.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # Paseo's scaffold uses TypeScript 5.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # The host library follows Paseo releases, on purpose and by hand.
+      - dependency-name: "@getpaseo/plugin"

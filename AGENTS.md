@@ -46,6 +46,16 @@ Put it in `plugins/<name>/` with `paseo-plugin.json` at its root (see the `paseo
 
 `plugins/file-viewer` came from `dbhq-uk/paseo-file-viewer` with its history (a subtree import). That repository is not touched by this one.
 
+## secrets
+
+`plugins/secrets` hands an agent a secret without it passing through the chat. The lines not to cross:
+
+- **The value is never logged, never put in a timeline row, never returned.** Plugin stdout and stderr are kept in memory and in `daemon.log`. `Broker.submit` passes the value straight to `writeSecret`. Tests search rows and tool results for a canary value.
+- **Files are `0600` in a `0700` folder that the user owns.** The default is a RAM-backed folder, found by filesystem type. Never call a folder "memory" unless it is.
+- **Names are validated in three places** (store, MCP server, RPC contract). Keep all three.
+- **Only providers in `PROVIDERS` get the MCP server.** A server a provider cannot use can stop an agent launching.
+- To test it live without the app, play the operator with `client.invokePluginRpc("secrets", "secrets.submit", ...)`, use a throwaway value, and delete it after.
+
 ## ferry
 
 `skills/ferry/scripts/ferry.py` is a receiver bound to `127.0.0.1`, published only by `tailscale serve`. These are the lines not to cross:
