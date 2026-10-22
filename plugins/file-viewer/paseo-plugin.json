@@ -1,4 +1,16 @@
 {
   "id": "file-viewer",
-  "requirements": { "paseo": ">=0.8.0" }
+  "name": "File viewer",
+  "description": "Read PDFs, images, Word documents and spreadsheets inside Paseo",
+  "requirements": {
+    "paseo": ">=0.8.0"
+  },
+  "build": [
+    [
+      "npm",
+      "ci",
+      "--omit=dev",
+      "--ignore-scripts"
+    ]
+  ]
 }
